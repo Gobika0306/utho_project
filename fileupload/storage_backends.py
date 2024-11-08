@@ -5,7 +5,6 @@ from io import BytesIO
 import logging
 from urllib.parse import urljoin
 
-
 class UthoCloudStorage(Storage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -17,6 +16,7 @@ class UthoCloudStorage(Storage):
         self.dc_zone = settings.UTHO_DC_ZONE
 
     def _get_headers(self):
+        # Authorization header to be sent in the request
         return {
             'Authorization': f"Bearer {self.api_key}",
             'Content-Type': 'multipart/form-data',
@@ -39,22 +39,21 @@ class UthoCloudStorage(Storage):
             raise IOError(f"Failed to open file from Utho Cloud: {e}")
 
     def _save(self, name, content):
-    # Ensure proper file path and correct URL construction
+        # Ensure proper file path and correct URL construction
         file_path = f"{self.subfolder}/{name}".lstrip('/')  # Remove leading slash if it exists
         upload_url = f"{self.endpoint_url}/upload/{self.bucket_name}/{self.dc_zone}/{file_path}"
         file_bytes = content.read()  # Read the file content
 
         try:
             logging.info(f"Uploading file to Utho Cloud: {upload_url}")
-            files = {'file': (name, file_bytes)}  # Ensure file is named correctly in form data
-            response = requests.post(upload_url, headers=self._get_headers(), files=files, timeout=30)
+            logging.debug(f"Files: {name}, Content: {file_bytes[:20]}... (first 20 bytes)")
+            response = requests.post(upload_url, headers=self._get_headers(), files={'file': (name, file_bytes)}, timeout=30)
             response.raise_for_status()  # Raise an error if the response code is not 2xx
             logging.info(f"Uploaded file '{file_path}' to Utho Cloud successfully.")
             return name  # Return the file name after upload
         except requests.RequestException as e:
-            logging.error(f"Failed to upload file to Utho Cloud: {e}")
+            logging.error(f"Failed to upload file: {e}, Response: {response.status_code}, {response.text}")
             raise IOError(f"Failed to save file to Utho Cloud: {e}")
-
 
     def exists(self, name):
         # Checks if a file exists in the bucket within the subfolder
